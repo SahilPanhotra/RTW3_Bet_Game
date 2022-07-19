@@ -7,7 +7,8 @@ contract Casino {
     address sideA;
     uint value;
     uint placedAt;
-    bool accepted;   
+    bool accepted;
+       
   }    // struct ProposedBet
 
 
@@ -15,6 +16,8 @@ contract Casino {
     address sideB;
     uint acceptedAt;
     uint randomB;
+    uint hashB;
+    bool Brevealed;
   }   // struct AcceptedBet
 
   // Proposed bets, keyed by the commitment value
@@ -29,8 +32,10 @@ contract Casino {
   );
 
   event BetAccepted (
-    uint indexed _commitment,
-    address indexed _sideA
+    uint indexed _commitmentA,
+    uint indexed _commitmentB,
+    address indexed _sideA,
+    address  _sideB
   );
 
 
@@ -59,27 +64,46 @@ contract Casino {
 
 
   // Called by sideB to continue
-  function acceptBet(uint _commitment, uint _random) external payable {
+  function acceptBet(uint _commitmentA, uint _commitmentB) external payable {
 
-    require(!proposedBet[_commitment].accepted,
+    require(!proposedBet[_commitmentA].accepted,
       "Bet has already been accepted");
-    require(proposedBet[_commitment].sideA != address(0),
+    require(proposedBet[_commitmentA].sideA != address(0),
       "Nobody made that bet");
-    require(msg.value == proposedBet[_commitment].value,
+    require(msg.value == proposedBet[_commitmentA].value,
       "Need to bet the same amount as sideA");
 
-    acceptedBet[_commitment].sideB = msg.sender;
-    acceptedBet[_commitment].acceptedAt = block.timestamp;
-    acceptedBet[_commitment].randomB = _random;
-    proposedBet[_commitment].accepted = true;
+    acceptedBet[_commitmentA].sideB = msg.sender;
+    acceptedBet[_commitmentA].acceptedAt = block.timestamp;
+    acceptedBet[_commitmentA].hashB = _commitmentB;
+    // proposedBet[_commitmentB].sideA = proposedBet[_commitmentA].sideA; //Store the commitment to point the address of side A
+    proposedBet[_commitmentA].accepted = true;
 
-    emit BetAccepted(_commitment, proposedBet[_commitment].sideA);
+    emit BetAccepted(_commitmentA,_commitmentB, proposedBet[_commitmentA].sideA,acceptedBet[_commitmentA].sideB);
   }   // function acceptBet
+
+  /*function getOrginalRandomByA(uint256 _random) public {
+      require(proposedBet[_commitmentA].accepted,
+      "Bet has not been accepted");
+      uint _commitmentA = uint256(keccak256(abi.encodePacked(_random)));
+            acceptedBet[_commitmentA].randomA=_random;
+  }*/
+  function getOrginalRandomByB(uint256 _random,uint _commitmentA) public {
+      require(proposedBet[_commitmentA].accepted,
+      "Bet has not been accepted");
+      uint _commitmentB = uint256(keccak256(abi.encodePacked(_random)));
+            require(acceptedBet[_commitmentA].hashB == _commitmentB,"Wrong Value of B");
+            acceptedBet[_commitmentA].randomB=_random;
+            acceptedBet[_commitmentA].Brevealed=true;
+
+  }
 
 
   // Called by sideA to reveal their random value and conclude the bet
   function reveal(uint _random) external {
+      
     uint _commitment = uint256(keccak256(abi.encodePacked(_random)));
+    require(acceptedBet[_commitment].Brevealed,"B Not revealed Yet Or Wrong Value of you random Number");
     address payable _sideA = payable(msg.sender);
     address payable _sideB = payable(acceptedBet[_commitment].sideB);
     uint _agreedRandom = _random ^ acceptedBet[_commitment].randomB;
